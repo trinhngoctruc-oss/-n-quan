@@ -2,16 +2,19 @@
 
 @layer base {
   html, body {
-    @apply h-full overflow-hidden;
-    overscroll-behavior: none;
+    @apply min-h-full;
+    overscroll-behavior-y: contain;
   }
   
   #root {
-    @apply h-full;
+    @apply min-h-full flex flex-col;
   }
 }
 
 /* Custom scrollbar for lobby */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+}
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }

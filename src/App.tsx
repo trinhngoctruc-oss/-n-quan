@@ -507,7 +507,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-[100dvh] bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center justify-center overflow-y-auto relative ${isLandscape ? 'landscape-mode p-1' : ''}`}>
+    <div className={`min-h-screen bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center relative ${isLandscape ? 'landscape-mode p-1' : 'justify-center'}`}>
       {/* Decorative Elements */}
       <div className={`absolute top-4 left-4 text-pink-300 animate-bounce opacity-50 ${isLandscape ? 'hidden' : ''}`}><Star size={30} fill="currentColor" /></div>
       <div className={`absolute bottom-4 right-4 text-yellow-300 animate-pulse opacity-50 ${isLandscape ? 'hidden' : ''}`}><Star size={20} fill="currentColor" /></div>
@@ -541,7 +541,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="bg-white p-8 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-2xl w-full z-10 flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto"
+            className="bg-white p-6 sm:p-8 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-2xl w-full z-10 flex flex-col md:flex-row gap-8 my-4"
           >
             <div className="flex-1 space-y-6">
               <h2 className="text-3xl font-black text-sky-600">Online Setup</h2>
