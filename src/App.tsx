@@ -5,7 +5,25 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RotateCcw, Info, Trophy, User, ChevronRight, ChevronLeft, Cpu, Users, Sparkles, Star, Candy } from 'lucide-react';
+import { RotateCcw, Info, Trophy, User, ChevronRight, ChevronLeft, Cpu, Users, Sparkles, Star, Candy, Globe, Copy, Check } from 'lucide-react';
+import { db, auth } from './firebase';
+import { 
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  updateDoc, 
+  serverTimestamp, 
+  getDoc,
+  collection,
+  addDoc,
+  Timestamp
+} from 'firebase/firestore';
 
 // --- Constants ---
 const BOARD_SIZE = 12;
@@ -13,7 +31,7 @@ const PLAYER_1_SQUARES = [0, 1, 2, 3, 4];
 const PLAYER_2_SQUARES = [6, 7, 8, 9, 10];
 const QUAN_SQUARES = [5, 11];
 
-type GameState = 'menu' | 'idle' | 'moving' | 'capturing' | 'gameOver';
+type GameState = 'menu' | 'idle' | 'moving' | 'capturing' | 'gameOver' | 'lobby';
 
 interface BoardState {
   stones: number[];
@@ -22,6 +40,9 @@ interface BoardState {
   status: GameState;
   message: string;
   isVsMachine: boolean;
+  isOnline?: boolean;
+  player1Id?: string;
+  player2Id?: string;
 }
 
 export default function App() {
@@ -34,11 +55,133 @@ export default function App() {
     isVsMachine: true,
   });
 
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [playerRole, setPlayerRole] = useState<0 | 1 | null>(null);
+  const [copied, setCopied] = useState(false);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
   const isMovingRef = useRef(false);
 
-  // --- AI Logic ---
+  // --- Firebase Auth ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("Login failed. Please make sure popups are allowed.");
+    }
+  };
+
+  // --- Firebase Sync ---
+  useEffect(() => {
+    if (!gameId || !board.isOnline) return;
+
+    const unsubscribe = onSnapshot(doc(db, 'games', gameId), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        // Only update if it's not our own move (to avoid interrupting animations)
+        // Or if the game just started/ended
+        if (data.status === 'gameOver' || data.status === 'idle') {
+          setBoard(prev => ({
+            ...prev,
+            stones: data.stones,
+            scores: data.scores as [number, number],
+            currentPlayer: data.currentPlayer,
+            status: data.status,
+            message: data.message,
+            player1Id: data.player1Id,
+            player2Id: data.player2Id,
+          }));
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [gameId, board.isOnline]);
+
+  const createOnlineGame = async () => {
+    if (!user) {
+      await loginWithGoogle();
+      return;
+    }
+    const newGame = {
+      stones: [5, 5, 5, 5, 5, 10, 5, 5, 5, 5, 5, 10],
+      scores: [0, 0],
+      currentPlayer: 0,
+      status: 'idle',
+      message: 'Waiting for Player 2...',
+      player1Id: user.uid,
+      player2Id: null,
+      updatedAt: serverTimestamp(),
+    };
+    const docRef = await addDoc(collection(db, 'games'), newGame);
+    setGameId(docRef.id);
+    setPlayerRole(0);
+    setBoard({
+      ...newGame,
+      status: 'lobby',
+      isVsMachine: false,
+      isOnline: true,
+    } as any);
+  };
+
+  const joinOnlineGame = async (id: string) => {
+    if (!user) {
+      await loginWithGoogle();
+      return;
+    }
+    if (!id) return;
+    const docRef = doc(db, 'games', id);
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      if (!data.player2Id && data.player1Id !== user.uid) {
+        await updateDoc(docRef, {
+          player2Id: user.uid,
+          message: 'Player 2 joined! Game Start!',
+          updatedAt: serverTimestamp(),
+        });
+        setPlayerRole(1);
+      } else if (data.player1Id === user.uid) {
+        setPlayerRole(0);
+      } else if (data.player2Id === user.uid) {
+        setPlayerRole(1);
+      } else {
+        alert('Game is full!');
+        return;
+      }
+      setGameId(id);
+      setBoard({
+        ...data,
+        status: 'idle',
+        isVsMachine: false,
+        isOnline: true,
+      } as any);
+    } else {
+      alert('Game not found!');
+    }
+  };
+
+  const syncBoardToFirebase = async (newBoard: BoardState) => {
+    if (!gameId || !board.isOnline) return;
+    await updateDoc(doc(db, 'games', gameId), {
+      stones: newBoard.stones,
+      scores: newBoard.scores,
+      currentPlayer: newBoard.currentPlayer,
+      status: newBoard.status,
+      message: newBoard.message,
+      updatedAt: serverTimestamp(),
+    });
+  };
 
   const simulateMove = (stones: number[], startIndex: number, direction: 'cw' | 'ccw', player: number) => {
     let currentStones = [...stones];
@@ -138,6 +281,9 @@ export default function App() {
     if (board.status !== 'idle' || isMovingRef.current) return;
     if (board.stones[startIndex] === 0) return;
     
+    // Online check: only move if it's your turn
+    if (board.isOnline && board.currentPlayer !== playerRole) return;
+
     isMovingRef.current = true;
     let currentStones = [...board.stones];
     let currentScores = [...board.scores] as [number, number];
@@ -201,6 +347,7 @@ export default function App() {
     await sleep(400);
 
     // Check game over
+    let finalBoard = { ...board, stones: currentStones, scores: currentScores };
     if (currentStones[5] === 0 && currentStones[11] === 0) {
       const p1Remaining = PLAYER_1_SQUARES.reduce((acc, idx) => acc + currentStones[idx], 0);
       const p2Remaining = PLAYER_2_SQUARES.reduce((acc, idx) => acc + currentStones[idx], 0);
@@ -210,7 +357,9 @@ export default function App() {
       PLAYER_2_SQUARES.forEach(idx => currentStones[idx] = 0);
       const winner = currentScores[0] > currentScores[1] ? 'Player 1 Wins! 🏆' : 
                      currentScores[1] > currentScores[0] ? (board.isVsMachine ? 'Machine Wins! 🤖' : 'Player 2 Wins! 🏆') : 'It\'s a Tie! 🤝';
-      setBoard({ ...board, stones: currentStones, scores: currentScores, status: 'gameOver', message: winner });
+      finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: winner };
+      setBoard(finalBoard);
+      if (board.isOnline) syncBoardToFirebase(finalBoard);
       isMovingRef.current = false;
       return;
     }
@@ -225,21 +374,24 @@ export default function App() {
         currentScores[nextPlayer] -= 5;
         nextPlayerSquares.forEach(idx => currentStones[idx] = 1);
       } else {
-        // End game if can't refill
-        setBoard({ ...board, stones: currentStones, scores: currentScores, status: 'gameOver', message: 'No more candies to refill!' });
+        finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: 'No more candies to refill!' };
+        setBoard(finalBoard);
+        if (board.isOnline) syncBoardToFirebase(finalBoard);
         isMovingRef.current = false;
         return;
       }
     }
 
-    setBoard({
-      ...board,
+    finalBoard = {
+      ...finalBoard,
       stones: currentStones,
       scores: currentScores,
       currentPlayer: nextPlayer as 0 | 1,
       status: 'idle',
       message: nextPlayer === 0 ? 'Your turn! ✨' : (board.isVsMachine ? 'Machine is thinking... 🤔' : 'Player 2\'s turn! 🌈'),
-    });
+    };
+    setBoard(finalBoard);
+    if (board.isOnline) syncBoardToFirebase(finalBoard);
     isMovingRef.current = false;
   };
 
@@ -273,7 +425,36 @@ export default function App() {
 
       {/* Main Content Area */}
       <AnimatePresence mode="wait">
-        {board.status === 'menu' ? (
+        {board.status === 'lobby' ? (
+          <motion.div 
+            key="lobby"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="bg-white p-10 rounded-[40px] shadow-2xl border-8 border-emerald-100 text-center max-w-md w-full z-10"
+          >
+            <h2 className="text-3xl font-black mb-4 text-emerald-600">Game Created!</h2>
+            <p className="text-sky-600 font-bold mb-6">Share this ID with your friend:</p>
+            <div className="bg-sky-50 p-4 rounded-2xl flex items-center justify-between gap-2 border-2 border-sky-100 mb-8">
+              <code className="text-lg font-black text-sky-800">{gameId}</code>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(gameId || '');
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="p-2 hover:bg-sky-200 rounded-lg transition-colors"
+              >
+                {copied ? <Check className="text-emerald-500" /> : <Copy className="text-sky-500" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-3 text-sky-400 animate-pulse">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full" />
+              <span className="font-bold text-sm">Waiting for Player 2 to join...</span>
+            </div>
+            <button onClick={resetToMenu} className="mt-8 text-pink-400 font-bold hover:underline">Cancel</button>
+          </motion.div>
+        ) : board.status === 'menu' ? (
           <motion.div 
             key="menu"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -296,8 +477,26 @@ export default function App() {
                 className="w-full flex items-center justify-center gap-4 py-6 bg-gradient-to-r from-purple-400 to-pink-500 text-white rounded-3xl font-black text-xl shadow-lg hover:scale-105 transition-all"
               >
                 <Users size={32} />
-                <span>VS FRIEND</span>
+                <span>VS FRIEND (LOCAL)</span>
               </button>
+              <button 
+                onClick={createOnlineGame}
+                className="w-full flex items-center justify-center gap-4 py-6 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-xl shadow-lg hover:scale-105 transition-all"
+              >
+                <Globe size={32} />
+                <span>{user ? 'ONLINE MULTIPLAYER' : 'LOGIN TO PLAY ONLINE'}</span>
+              </button>
+              
+              <div className="pt-4 flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Enter Game ID to Join" 
+                  className="flex-1 px-4 py-3 rounded-xl border-2 border-sky-100 focus:border-sky-400 outline-none text-sm font-bold"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') joinOnlineGame((e.target as HTMLInputElement).value);
+                  }}
+                />
+              </div>
             </div>
             <p className="mt-8 text-sky-300 text-sm font-medium">Traditional Vietnamese game with a sweet twist!</p>
           </motion.div>

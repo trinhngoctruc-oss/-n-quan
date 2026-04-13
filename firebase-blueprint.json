@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "Game": {
+      "title": "Game",
+      "description": "Represents a multiplayer game session of Ô Ăn Quan.",
+      "type": "object",
+      "properties": {
+        "stones": {
+          "type": "array",
+          "description": "The number of stones in each of the 12 squares."
+        },
+        "scores": {
+          "type": "array",
+          "description": "The scores of the two players [scoreP1, scoreP2]."
+        },
+        "currentPlayer": {
+          "type": "number",
+          "description": "The index of the current player (0 or 1)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "moving", "gameOver"],
+          "description": "The current status of the game."
+        },
+        "message": {
+          "type": "string",
+          "description": "The status message to display."
+        },
+        "player1Id": {
+          "type": "string",
+          "description": "The UID of player 1."
+        },
+        "player2Id": {
+          "type": "string",
+          "description": "The UID of player 2."
+        },
+        "lastMove": {
+          "type": "object",
+          "description": "Metadata about the last move performed."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The last time the game state was updated."
+        }
+      },
+      "required": ["stones", "scores", "currentPlayer", "status", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/games/{gameId}": {
+      "schema": "Game",
+      "description": "Collection of active and past game sessions."
+    }
+  }
+}

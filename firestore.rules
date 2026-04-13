@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isPlayerInGame(gameData) {
+      return isAuthenticated() && (request.auth.uid == gameData.player1Id || request.auth.uid == gameData.player2Id);
+    }
+
+    function isValidGame(data) {
+      return data.stones is list && data.stones.size() == 12 &&
+             data.scores is list && data.scores.size() == 2 &&
+             data.currentPlayer in [0, 1] &&
+             data.status is string &&
+             data.updatedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /games/{gameId} {
+      // Anyone authenticated can list/create games
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidGame(request.resource.data);
+      
+      // Only players in the game can update it
+      allow update: if isPlayerInGame(resource.data) && isValidGame(request.resource.data);
+      
+      // No one can delete games for now
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if request.auth.uid == userId;
+    }
+  }
+}
