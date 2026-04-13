@@ -69,8 +69,18 @@ export default function App() {
   const [publicGames, setPublicGames] = useState<any[]>([]);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
+  const [isLandscape, setIsLandscape] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const isMovingRef = useRef(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
 
   // --- Firebase Sync ---
   useEffect(() => {
@@ -497,29 +507,29 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen max-h-screen bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center justify-center overflow-hidden relative landscape:p-1">
+    <div className={`min-h-[100dvh] bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center justify-center overflow-y-auto relative ${isLandscape ? 'landscape-mode p-1' : ''}`}>
       {/* Decorative Elements */}
-      <div className="absolute top-4 left-4 text-pink-300 animate-bounce opacity-50 landscape:hidden"><Star size={30} fill="currentColor" /></div>
-      <div className="absolute bottom-4 right-4 text-yellow-300 animate-pulse opacity-50 landscape:hidden"><Star size={20} fill="currentColor" /></div>
-      <div className="absolute top-10 right-10 text-purple-300 animate-spin-slow opacity-50 landscape:hidden"><Sparkles size={25} /></div>
+      <div className={`absolute top-4 left-4 text-pink-300 animate-bounce opacity-50 ${isLandscape ? 'hidden' : ''}`}><Star size={30} fill="currentColor" /></div>
+      <div className={`absolute bottom-4 right-4 text-yellow-300 animate-pulse opacity-50 ${isLandscape ? 'hidden' : ''}`}><Star size={20} fill="currentColor" /></div>
+      <div className={`absolute top-10 right-10 text-purple-300 animate-spin-slow opacity-50 ${isLandscape ? 'hidden' : ''}`}><Sparkles size={25} /></div>
 
       {/* Header */}
-      <div className="w-full max-w-4xl flex justify-between items-center mb-4 z-10 px-2 landscape:mb-1 landscape:max-w-full">
+      <div className={`w-full max-w-4xl flex justify-between items-center mb-4 z-10 px-2 ${isLandscape ? 'mb-1 max-w-full' : ''}`}>
         <div className="flex items-center gap-2">
           <motion.div 
             whileHover={{ scale: 1.1, rotate: 10 }}
-            className="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg border-2 border-white landscape:w-8 landscape:h-8"
+            className={`bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg border-2 border-white ${isLandscape ? 'w-8 h-8' : 'w-10 h-10'}`}
           >
-            <Candy size={20} className="landscape:w-4 landscape:h-4" />
+            <Candy size={isLandscape ? 16 : 20} />
           </motion.div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 landscape:text-lg">Candy Quan</h1>
+            <h1 className={`font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 ${isLandscape ? 'text-lg' : 'text-xl'}`}>Candy Quan</h1>
           </div>
         </div>
         
         <div className="flex gap-2">
-          <button onClick={() => setShowRules(true)} className="p-2 bg-white rounded-xl text-sky-400 shadow-md hover:bg-sky-100 transition-all landscape:p-1.5"><Info size={18} className="landscape:w-4 landscape:h-4" /></button>
-          <button onClick={resetToMenu} className="p-2 bg-white rounded-xl text-pink-400 shadow-md hover:bg-pink-50 transition-all landscape:p-1.5"><RotateCcw size={18} className="landscape:w-4 landscape:h-4" /></button>
+          <button onClick={() => setShowRules(true)} className={`bg-white rounded-xl text-sky-400 shadow-md hover:bg-sky-100 transition-all ${isLandscape ? 'p-1.5' : 'p-2'}`}><Info size={isLandscape ? 16 : 18} /></button>
+          <button onClick={resetToMenu} className={`bg-white rounded-xl text-pink-400 shadow-md hover:bg-pink-50 transition-all ${isLandscape ? 'p-1.5' : 'p-2'}`}><RotateCcw size={isLandscape ? 16 : 18} /></button>
         </div>
       </div>
 
@@ -531,7 +541,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="bg-white p-8 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-2xl w-full z-10 flex flex-col md:flex-row gap-8"
+            className="bg-white p-8 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-2xl w-full z-10 flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex-1 space-y-6">
               <h2 className="text-3xl font-black text-sky-600">Online Setup</h2>
@@ -687,7 +697,7 @@ export default function App() {
             className="flex flex-col items-center z-10 w-full"
           >
             {/* Game Board */}
-            <div className="relative bg-white/80 backdrop-blur-md p-4 sm:p-8 rounded-[40px] sm:rounded-[60px] shadow-2xl border-4 sm:border-8 border-sky-200 mb-4 scale-[0.85] sm:scale-100 landscape:scale-[0.65] landscape:sm:scale-90 landscape:mb-2 origin-center">
+            <div className={`relative bg-white/80 backdrop-blur-md p-4 sm:p-8 rounded-[40px] sm:rounded-[60px] shadow-2xl border-4 sm:border-8 border-sky-200 mb-4 scale-[0.85] sm:scale-100 origin-center ${isLandscape ? 'scale-[0.6] mb-2' : ''}`}>
               <div className="flex items-center gap-0">
                 <div className="mr-[-2px] sm:mr-[-4px]"><Square index={11} isQuan stones={board.stones[11]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} selectedSquare={selectedSquare} setSelectedSquare={setSelectedSquare} playerRole={playerRole} /></div>
                 <div className="flex flex-col gap-0">
@@ -706,13 +716,13 @@ export default function App() {
               </div>
 
               {/* Player Badges */}
-              <div className={`absolute -top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 landscape:-top-6 landscape:px-4 landscape:py-1 landscape:text-xs ${
+              <div className={`absolute -top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 ${isLandscape ? '-top-6 px-4 py-1 text-xs' : ''} ${
                 board.currentPlayer === 1 ? 'bg-purple-500 text-white scale-110' : 'bg-white text-purple-300'
               }`}>
                 {board.isVsMachine ? <Cpu size={16} /> : <User size={16} />}
                 {board.isVsMachine ? 'MACHINE' : (board.player2Name || 'PLAYER 2')}
               </div>
-              <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 landscape:-bottom-6 landscape:px-4 landscape:py-1 landscape:text-xs ${
+              <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 ${isLandscape ? '-bottom-6 px-4 py-1 text-xs' : ''} ${
                 board.currentPlayer === 0 ? 'bg-pink-500 text-white scale-110' : 'bg-white text-pink-300'
               }`}>
                 <User size={16} />
@@ -721,36 +731,36 @@ export default function App() {
             </div>
 
             {/* Scores */}
-            <div className="w-full max-w-md grid grid-cols-2 gap-4 mb-4 landscape:mb-1 landscape:gap-2 landscape:max-w-lg">
-              <div className={`p-4 rounded-[24px] border-4 transition-all landscape:p-2 landscape:rounded-xl ${
+            <div className={`w-full max-w-md grid grid-cols-2 gap-4 mb-4 ${isLandscape ? 'mb-1 gap-2 max-w-lg' : ''}`}>
+              <div className={`p-4 rounded-[24px] border-4 transition-all ${isLandscape ? 'p-2 rounded-xl' : ''} ${
                 board.currentPlayer === 0 ? 'bg-white border-pink-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-black text-pink-400 uppercase landscape:text-[8px]">{board.player1Name || 'P1'} Score</span>
-                  <Candy size={14} className="text-pink-300 landscape:w-3 landscape:h-3" />
+                  <span className={`font-black text-pink-400 uppercase ${isLandscape ? 'text-[8px]' : 'text-[10px]'}`}>{board.player1Name || 'P1'} Score</span>
+                  <Candy size={isLandscape ? 12 : 14} className="text-pink-300" />
                 </div>
-                <div className="text-2xl font-black text-sky-900 landscape:text-xl">{board.scores[0]}</div>
+                <div className={`font-black text-sky-900 ${isLandscape ? 'text-xl' : 'text-2xl'}`}>{board.scores[0]}</div>
               </div>
-              <div className={`p-4 rounded-[24px] border-4 transition-all landscape:p-2 landscape:rounded-xl ${
+              <div className={`p-4 rounded-[24px] border-4 transition-all ${isLandscape ? 'p-2 rounded-xl' : ''} ${
                 board.currentPlayer === 1 ? 'bg-white border-purple-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-black text-purple-400 uppercase landscape:text-[8px]">{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
-                  <Candy size={14} className="text-purple-300 landscape:w-3 landscape:h-3" />
+                  <span className={`font-black text-purple-400 uppercase ${isLandscape ? 'text-[8px]' : 'text-[10px]'}`}>{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
+                  <Candy size={isLandscape ? 12 : 14} className="text-purple-300" />
                 </div>
-                <div className="text-2xl font-black text-sky-900 landscape:text-xl">{board.scores[1]}</div>
+                <div className={`font-black text-sky-900 ${isLandscape ? 'text-xl' : 'text-2xl'}`}>{board.scores[1]}</div>
               </div>
             </div>
 
             {/* Message */}
-            <div className="text-center h-12 landscape:h-6">
+            <div className={`text-center ${isLandscape ? 'h-6' : 'h-12'}`}>
               <AnimatePresence mode="wait">
                 <motion.p
                   key={board.message}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 1.1 }}
-                  className="text-lg font-black text-sky-600 drop-shadow-sm landscape:text-sm"
+                  className={`font-black text-sky-600 drop-shadow-sm ${isLandscape ? 'text-sm' : 'text-lg'}`}
                 >
                   {board.message}
                 </motion.p>

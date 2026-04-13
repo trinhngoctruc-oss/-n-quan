@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@layer base {
+  html, body {
+    @apply h-full overflow-hidden;
+    overscroll-behavior: none;
+  }
+  
+  #root {
+    @apply h-full;
+  }
+}
+
+/* Custom scrollbar for lobby */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-sky-200 rounded-full;
+}
