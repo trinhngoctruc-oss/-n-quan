@@ -67,6 +67,7 @@ export default function App() {
   const [playerRole, setPlayerRole] = useState<0 | 1 | null>(null);
   const [copied, setCopied] = useState(false);
   const [publicGames, setPublicGames] = useState<any[]>([]);
+  const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
   const isMovingRef = useRef(false);
@@ -116,7 +117,14 @@ export default function App() {
           }));
         }
 
-        if (data.status === 'gameOver' || data.status === 'idle') {
+        // Animation Sync: If the other player moved
+        if (data.status === 'moving' && data.lastMove && data.lastMove.playerId !== guestId) {
+          if (!isMovingRef.current) {
+            handleMove(data.lastMove.startIndex, data.lastMove.direction, true);
+          }
+        }
+
+        if (data.status === 'gameOver' || (data.status === 'idle' && !isMovingRef.current)) {
           setBoard(prev => ({
             ...prev,
             stones: data.stones,
@@ -326,14 +334,30 @@ export default function App() {
     setBoard(prev => ({ ...prev, status: 'menu' }));
   };
 
-  const handleMove = async (startIndex: number, direction: 'cw' | 'ccw') => {
-    if (board.status !== 'idle' || isMovingRef.current) return;
+  const handleMove = async (startIndex: number, direction: 'cw' | 'ccw', isRemote = false) => {
+    if (board.status !== 'idle' && !isRemote) return;
+    if (isMovingRef.current) return;
     if (board.stones[startIndex] === 0) return;
     
-    // Online check: only move if it's your turn
-    if (board.isOnline && board.currentPlayer !== playerRole) return;
+    // Online check: only move if it's your turn (unless it's a remote update)
+    if (board.isOnline && board.currentPlayer !== playerRole && !isRemote) return;
 
     isMovingRef.current = true;
+    setSelectedSquare(null);
+
+    // Sync move start to Firebase if we are the initiator
+    if (board.isOnline && !isRemote) {
+      await updateDoc(doc(db, 'games', gameId!), {
+        status: 'moving',
+        lastMove: {
+          startIndex,
+          direction,
+          playerId: guestId
+        },
+        updatedAt: serverTimestamp()
+      });
+    }
+
     let currentStones = [...board.stones];
     let currentScores = [...board.scores] as [number, number];
     let hand = currentStones[startIndex];
@@ -351,12 +375,12 @@ export default function App() {
       hand--;
       setBoard(prev => ({ ...prev, stones: [...currentStones] }));
       setAnimatingIndex(currentIndex);
-      await sleep(150);
+      await sleep(250); // Slower speed for better tracking
 
       if (hand === 0) {
         const nextIndex = (currentIndex + step + BOARD_SIZE) % BOARD_SIZE;
         if (currentStones[nextIndex] > 0 && !QUAN_SQUARES.includes(nextIndex)) {
-          await sleep(300);
+          await sleep(400);
           hand = currentStones[nextIndex];
           currentStones[nextIndex] = 0;
           setBoard(prev => ({ ...prev, stones: [...currentStones], message: 'Keep going! 🍭' }));
@@ -364,7 +388,7 @@ export default function App() {
           let captureIndex = (nextIndex + step + BOARD_SIZE) % BOARD_SIZE;
           let currentNextIndex = nextIndex;
           while (currentStones[currentNextIndex] === 0 && currentStones[captureIndex] > 0) {
-            await sleep(400);
+            await sleep(500);
             const captured = currentStones[captureIndex];
             currentScores[board.currentPlayer] += captured;
             currentStones[captureIndex] = 0;
@@ -393,7 +417,7 @@ export default function App() {
     }
 
     setAnimatingIndex(null);
-    await sleep(400);
+    await sleep(500);
 
     // Check game over
     let finalBoard = { ...board, stones: currentStones, scores: currentScores };
@@ -408,7 +432,7 @@ export default function App() {
                      currentScores[1] > currentScores[0] ? (board.isVsMachine ? 'Machine Wins! 🤖' : 'Player 2 Wins! 🏆') : 'It\'s a Tie! 🤝';
       finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: winner };
       setBoard(finalBoard);
-      if (board.isOnline) syncBoardToFirebase(finalBoard);
+      if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
       isMovingRef.current = false;
       return;
     }
@@ -425,7 +449,7 @@ export default function App() {
       } else {
         finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: 'No more candies to refill!' };
         setBoard(finalBoard);
-        if (board.isOnline) syncBoardToFirebase(finalBoard);
+        if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
         isMovingRef.current = false;
         return;
       }
@@ -440,35 +464,34 @@ export default function App() {
       message: nextPlayer === 0 ? 'Your turn! ✨' : (board.isVsMachine ? 'Machine is thinking... 🤔' : 'Player 2\'s turn! 🌈'),
     };
     setBoard(finalBoard);
-    if (board.isOnline) syncBoardToFirebase(finalBoard);
+    if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
     isMovingRef.current = false;
   };
 
   return (
-    <div className="min-h-screen bg-sky-50 text-sky-900 font-sans p-4 flex flex-col items-center justify-center overflow-hidden relative">
+    <div className="h-screen max-h-screen bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center justify-center overflow-hidden relative">
       {/* Decorative Elements */}
-      <div className="absolute top-10 left-10 text-pink-300 animate-bounce"><Star size={40} fill="currentColor" /></div>
-      <div className="absolute bottom-10 right-10 text-yellow-300 animate-pulse"><Star size={30} fill="currentColor" /></div>
-      <div className="absolute top-20 right-20 text-purple-300 animate-spin-slow"><Sparkles size={35} /></div>
+      <div className="absolute top-4 left-4 text-pink-300 animate-bounce opacity-50"><Star size={30} fill="currentColor" /></div>
+      <div className="absolute bottom-4 right-4 text-yellow-300 animate-pulse opacity-50"><Star size={20} fill="currentColor" /></div>
+      <div className="absolute top-10 right-10 text-purple-300 animate-spin-slow opacity-50"><Sparkles size={25} /></div>
 
       {/* Header */}
-      <div className="w-full max-w-4xl flex justify-between items-center mb-8 z-10">
-        <div className="flex items-center gap-4">
+      <div className="w-full max-w-4xl flex justify-between items-center mb-4 z-10 px-2">
+        <div className="flex items-center gap-2">
           <motion.div 
             whileHover={{ scale: 1.1, rotate: 10 }}
-            className="w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-500 rounded-2xl flex items-center justify-center text-white shadow-xl border-4 border-white"
+            className="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg border-2 border-white"
           >
-            <Candy size={32} />
+            <Candy size={20} />
           </motion.div>
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Candy Quan</h1>
-            <p className="text-xs text-sky-400 uppercase tracking-widest font-bold">Sweet Strategy Adventure</p>
+            <h1 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Candy Quan</h1>
           </div>
         </div>
         
-        <div className="flex gap-3">
-          <button onClick={() => setShowRules(true)} className="p-3 bg-white rounded-2xl text-sky-400 shadow-md hover:bg-sky-100 transition-all"><Info size={24} /></button>
-          <button onClick={resetToMenu} className="p-3 bg-white rounded-2xl text-pink-400 shadow-md hover:bg-pink-50 transition-all"><RotateCcw size={24} /></button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowRules(true)} className="p-2 bg-white rounded-xl text-sky-400 shadow-md hover:bg-sky-100 transition-all"><Info size={18} /></button>
+          <button onClick={resetToMenu} className="p-2 bg-white rounded-xl text-pink-400 shadow-md hover:bg-pink-50 transition-all"><RotateCcw size={18} /></button>
         </div>
       </div>
 
@@ -633,25 +656,25 @@ export default function App() {
             key="game"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center z-10"
+            className="flex flex-col items-center z-10 w-full"
           >
             {/* Game Board */}
-            <div className="relative bg-white/80 backdrop-blur-md p-10 rounded-[60px] shadow-2xl border-8 border-sky-200 mb-8">
+            <div className="relative bg-white/80 backdrop-blur-md p-4 sm:p-8 rounded-[40px] sm:rounded-[60px] shadow-2xl border-4 sm:border-8 border-sky-200 mb-4 scale-[0.85] sm:scale-100 origin-center">
               <div className="flex items-center gap-0">
-                <div className="mr-[-4px]"><Square index={11} isQuan stones={board.stones[11]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} /></div>
+                <div className="mr-[-2px] sm:mr-[-4px]"><Square index={11} isQuan stones={board.stones[11]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} selectedSquare={selectedSquare} setSelectedSquare={setSelectedSquare} playerRole={playerRole} /></div>
                 <div className="flex flex-col gap-0">
                   <div className="flex flex-row-reverse">
                     {PLAYER_2_SQUARES.map(idx => (
-                      <Square key={idx} index={idx} stones={board.stones[idx]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} />
+                      <Square key={idx} index={idx} stones={board.stones[idx]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} selectedSquare={selectedSquare} setSelectedSquare={setSelectedSquare} playerRole={playerRole} />
                     ))}
                   </div>
                   <div className="flex">
                     {PLAYER_1_SQUARES.map(idx => (
-                      <Square key={idx} index={idx} stones={board.stones[idx]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} />
+                      <Square key={idx} index={idx} stones={board.stones[idx]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} selectedSquare={selectedSquare} setSelectedSquare={setSelectedSquare} playerRole={playerRole} />
                     ))}
                   </div>
                 </div>
-                <div className="ml-[-4px]"><Square index={5} isQuan stones={board.stones[5]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} /></div>
+                <div className="ml-[-2px] sm:ml-[-4px]"><Square index={5} isQuan stones={board.stones[5]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} selectedSquare={selectedSquare} setSelectedSquare={setSelectedSquare} playerRole={playerRole} /></div>
               </div>
 
               {/* Player Badges */}
@@ -670,36 +693,36 @@ export default function App() {
             </div>
 
             {/* Scores */}
-            <div className="w-full max-w-md grid grid-cols-2 gap-6 mb-8">
-              <div className={`p-6 rounded-[32px] border-4 transition-all ${
+            <div className="w-full max-w-md grid grid-cols-2 gap-4 mb-4">
+              <div className={`p-4 rounded-[24px] border-4 transition-all ${
                 board.currentPlayer === 0 ? 'bg-white border-pink-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-pink-400 uppercase">{board.player1Name || 'P1'} Score</span>
-                  <Candy size={16} className="text-pink-300" />
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black text-pink-400 uppercase">{board.player1Name || 'P1'} Score</span>
+                  <Candy size={14} className="text-pink-300" />
                 </div>
-                <div className="text-4xl font-black text-sky-900">{board.scores[0]}</div>
+                <div className="text-2xl font-black text-sky-900">{board.scores[0]}</div>
               </div>
-              <div className={`p-6 rounded-[32px] border-4 transition-all ${
+              <div className={`p-4 rounded-[24px] border-4 transition-all ${
                 board.currentPlayer === 1 ? 'bg-white border-purple-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-purple-400 uppercase">{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
-                  <Candy size={16} className="text-purple-300" />
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black text-purple-400 uppercase">{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
+                  <Candy size={14} className="text-purple-300" />
                 </div>
-                <div className="text-4xl font-black text-sky-900">{board.scores[1]}</div>
+                <div className="text-2xl font-black text-sky-900">{board.scores[1]}</div>
               </div>
             </div>
 
             {/* Message */}
-            <div className="text-center h-16">
+            <div className="text-center h-12">
               <AnimatePresence mode="wait">
                 <motion.p
                   key={board.message}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 1.1 }}
-                  className="text-2xl font-black text-sky-600 drop-shadow-sm"
+                  className="text-lg font-black text-sky-600 drop-shadow-sm"
                 >
                   {board.message}
                 </motion.p>
@@ -758,7 +781,14 @@ export default function App() {
 const Stone = ({ count, isQuan }: { count: number; isQuan?: boolean }) => {
   if (count === 0) return null;
   const displayCount = Math.min(count, isQuan ? 12 : 8);
-  const colors = ['bg-pink-400', 'bg-purple-400', 'bg-yellow-400', 'bg-sky-400', 'bg-orange-400', 'bg-green-400'];
+  const colors = [
+    'from-pink-400 to-pink-600', 
+    'from-purple-400 to-purple-600', 
+    'from-yellow-300 to-yellow-500', 
+    'from-sky-400 to-sky-600', 
+    'from-orange-400 to-orange-600', 
+    'from-emerald-400 to-emerald-600'
+  ];
   
   return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -766,16 +796,22 @@ const Stone = ({ count, isQuan }: { count: number; isQuan?: boolean }) => {
         {Array.from({ length: displayCount }).map((_, i) => (
           <motion.div
             key={i}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className={`w-3 h-3 rounded-full shadow-sm border border-white/30 ${
-              isQuan ? 'w-4 h-4 shadow-md' : ''
+            initial={{ scale: 0, y: -10 }}
+            animate={{ scale: 1, y: 0 }}
+            className={`rounded-full shadow-[inset_-2px_-2px_4px_rgba(0,0,0,0.3),2px_2px_4px_rgba(0,0,0,0.2)] border border-white/40 bg-gradient-to-br ${
+              isQuan ? 'w-4 h-4' : 'w-3 h-3'
             } ${colors[i % colors.length]}`}
-            style={{ transform: `translate(${Math.sin(i) * 3}px, ${Math.cos(i) * 3}px)` }}
-          />
+            style={{ 
+              transform: `translate(${Math.sin(i * 1.5) * 4}px, ${Math.cos(i * 1.5) * 4}px)`,
+              position: 'relative'
+            }}
+          >
+            {/* Highlight for 3D effect */}
+            <div className="absolute top-0.5 left-0.5 w-1 h-1 bg-white/60 rounded-full blur-[0.5px]" />
+          </motion.div>
         ))}
       </div>
-      <div className="absolute -bottom-1 -right-1 bg-white/90 text-sky-600 text-[12px] font-black w-6 h-6 flex items-center justify-center rounded-full shadow-sm border-2 border-sky-100">
+      <div className="absolute -bottom-1 -right-1 bg-white/95 text-sky-600 text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shadow-md border border-sky-100 z-10">
         {count}
       </div>
     </div>
@@ -790,36 +826,65 @@ interface SquareProps {
   status: string;
   animatingIndex: number | null;
   onMove: (index: number, direction: 'cw' | 'ccw') => void;
+  selectedSquare: number | null;
+  setSelectedSquare: (index: number | null) => void;
+  playerRole: 0 | 1 | null;
   key?: React.Key;
 }
 
-const Square = ({ index, isQuan, stones, currentPlayer, status, animatingIndex, onMove }: SquareProps) => {
+const Square = ({ index, isQuan, stones, currentPlayer, status, animatingIndex, onMove, selectedSquare, setSelectedSquare, playerRole }: SquareProps) => {
   const PLAYER_1_SQUARES = [0, 1, 2, 3, 4];
   const PLAYER_2_SQUARES = [6, 7, 8, 9, 10];
   const isCurrentPlayerSquare = (currentPlayer === 0 && PLAYER_1_SQUARES.includes(index)) ||
                                 (currentPlayer === 1 && PLAYER_2_SQUARES.includes(index));
-  const canInteract = status === 'idle' && isCurrentPlayerSquare && stones > 0;
+  
+  // In online mode, only allow interaction if it's the player's role
+  const isMyTurn = playerRole === null || currentPlayer === playerRole;
+  const canInteract = status === 'idle' && isCurrentPlayerSquare && stones > 0 && isMyTurn;
   const isAnimating = animatingIndex === index;
+  const isSelected = selectedSquare === index;
 
   return (
     <div 
-      className={`relative flex items-center justify-center border-4 border-sky-100 transition-all duration-300 ${
-        isQuan ? 'w-28 h-56 rounded-t-full bg-gradient-to-b from-sky-100/50 to-white' : 'w-24 h-24 bg-white/60'
-      } ${isAnimating ? 'bg-yellow-100 ring-4 ring-yellow-400 scale-105 z-20' : ''} ${
-        canInteract ? 'cursor-pointer hover:bg-pink-50 hover:scale-105 z-10' : ''
-      }`}
+      className={`relative flex items-center justify-center border-2 sm:border-4 border-sky-100 transition-all duration-300 ${
+        isQuan ? 'w-16 h-32 sm:w-28 sm:h-56 rounded-t-full bg-gradient-to-b from-sky-100/50 to-white' : 'w-14 h-14 sm:w-24 sm:h-24 bg-white/60'
+      } ${isAnimating ? 'bg-yellow-100 ring-2 sm:ring-4 ring-yellow-400 scale-105 z-20' : ''} ${
+        canInteract ? 'cursor-pointer hover:bg-pink-50 z-10' : ''
+      } ${isSelected ? 'bg-pink-100 ring-2 sm:ring-4 ring-pink-400 z-20' : ''}`}
       style={isQuan && index === 11 ? { transform: 'rotate(-90deg)' } : isQuan && index === 5 ? { transform: 'rotate(90deg)' } : {}}
+      onClick={() => {
+        if (canInteract) {
+          setSelectedSquare(isSelected ? null : index);
+        }
+      }}
     >
       <Stone count={stones} isQuan={isQuan} />
       
-      {canInteract && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-pink-400/10 rounded-xl">
-          <div className="flex gap-3">
-            <button onClick={(e) => { e.stopPropagation(); onMove(index, 'ccw'); }} className="p-2 bg-white text-pink-500 rounded-full shadow-xl hover:bg-pink-500 hover:text-white transition-all transform hover:scale-110"><ChevronLeft size={20} /></button>
-            <button onClick={(e) => { e.stopPropagation(); onMove(index, 'cw'); }} className="p-2 bg-white text-pink-500 rounded-full shadow-xl hover:bg-pink-500 hover:text-white transition-all transform hover:scale-110"><ChevronRight size={20} /></button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isSelected && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"
+          >
+            <div className="flex gap-1 sm:gap-3 pointer-events-auto">
+              <button 
+                onClick={(e) => { e.stopPropagation(); onMove(index, 'ccw'); }} 
+                className="p-1.5 sm:p-2 bg-white text-pink-500 rounded-full shadow-xl border-2 border-pink-200 hover:bg-pink-500 hover:text-white transition-all transform hover:scale-110"
+              >
+                <ChevronLeft size={16} className="sm:w-5 sm:h-5" />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onMove(index, 'cw'); }} 
+                className="p-1.5 sm:p-2 bg-white text-pink-500 rounded-full shadow-xl border-2 border-pink-200 hover:bg-pink-500 hover:text-white transition-all transform hover:scale-110"
+              >
+                <ChevronRight size={16} className="sm:w-5 sm:h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

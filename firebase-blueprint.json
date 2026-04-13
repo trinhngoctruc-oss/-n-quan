@@ -36,7 +36,11 @@
         },
         "lastMove": {
           "type": "object",
-          "description": "Metadata about the last move performed."
+          "properties": {
+            "startIndex": { "type": "number" },
+            "direction": { "type": "string", "enum": ["cw", "ccw"] },
+            "playerId": { "type": "string" }
+          }
         },
         "updatedAt": {
           "type": "string",
