@@ -13,6 +13,11 @@ import {
   updateDoc, 
   serverTimestamp, 
   getDoc,
+  getDocs,
+  query,
+  where,
+  limit,
+  orderBy,
   collection,
   addDoc
 } from 'firebase/firestore';
@@ -58,13 +63,37 @@ export default function App() {
     return newId;
   });
   const [gameId, setGameId] = useState<string | null>(null);
+  const [shortId, setShortId] = useState<string | null>(null);
   const [playerRole, setPlayerRole] = useState<0 | 1 | null>(null);
   const [copied, setCopied] = useState(false);
+  const [publicGames, setPublicGames] = useState<any[]>([]);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
   const isMovingRef = useRef(false);
 
   // --- Firebase Sync ---
+  useEffect(() => {
+    // Listen for public games (lobby status)
+    const gamesRef = collection(db, 'games');
+    const q = query(
+      gamesRef, 
+      where('status', '==', 'idle'), 
+      where('player2Id', '==', null),
+      orderBy('updatedAt', 'desc'),
+      limit(10)
+    );
+
+    const unsubscribeLobby = onSnapshot(q, (snapshot) => {
+      const games = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPublicGames(games);
+    });
+
+    return () => unsubscribeLobby();
+  }, []);
+
   useEffect(() => {
     if (!gameId || !board.isOnline) return;
 
@@ -72,6 +101,10 @@ export default function App() {
       if (snapshot.exists()) {
         const data = snapshot.data();
         
+        if (data.shortId && !shortId) {
+          setShortId(data.shortId);
+        }
+
         // If we are in lobby and player 2 joins, start the game
         if (board.status === 'lobby' && data.player2Id) {
           setBoard(prev => ({
@@ -121,7 +154,11 @@ export default function App() {
       updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, 'games'), newGame);
+    const sId = docRef.id.substring(0, 6).toUpperCase();
+    await updateDoc(docRef, { shortId: sId });
+    
     setGameId(docRef.id);
+    setShortId(sId);
     setPlayerRole(0);
     setBoard({
       ...newGame,
@@ -131,14 +168,28 @@ export default function App() {
     } as any);
   };
 
-  const joinOnlineGame = async (id: string) => {
+  const joinOnlineGame = async (inputRef: string) => {
     if (!playerName.trim()) {
       alert('Please enter your name first!');
       return;
     }
-    if (!id) return;
-    const docRef = doc(db, 'games', id);
-    const snapshot = await getDoc(docRef);
+    if (!inputRef) return;
+
+    // Try to find by full ID first, then by shortId
+    let docRef = doc(db, 'games', inputRef);
+    let snapshot = await getDoc(docRef);
+
+    if (!snapshot.exists()) {
+      // Search by shortId
+      const gamesRef = collection(db, 'games');
+      const q = query(gamesRef, where('shortId', '==', inputRef.toUpperCase()), limit(1));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        snapshot = querySnapshot.docs[0];
+        docRef = doc(db, 'games', snapshot.id);
+      }
+    }
+
     if (snapshot.exists()) {
       const data = snapshot.data();
       if (!data.player2Id && data.player1Id !== guestId) {
@@ -157,7 +208,7 @@ export default function App() {
         alert('Game is full!');
         return;
       }
-      setGameId(id);
+      setGameId(docRef.id);
       setBoard({
         ...data,
         status: 'idle',
@@ -429,10 +480,10 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="bg-white p-10 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-md w-full z-10"
+            className="bg-white p-8 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-2xl w-full z-10 flex flex-col md:flex-row gap-8"
           >
-            <h2 className="text-3xl font-black mb-6 text-sky-600">Online Setup</h2>
-            <div className="space-y-6">
+            <div className="flex-1 space-y-6">
+              <h2 className="text-3xl font-black text-sky-600">Online Setup</h2>
               <div className="text-left">
                 <label className="block text-xs font-black text-sky-400 uppercase tracking-widest mb-2 ml-2">Your Name</label>
                 <input 
@@ -444,43 +495,74 @@ export default function App() {
                 />
               </div>
               
-              <div className="grid grid-cols-1 gap-4">
-                <button 
-                  onClick={createOnlineGame}
-                  className="w-full flex items-center justify-center gap-4 py-5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all"
-                >
-                  <Globe size={24} />
-                  <span>CREATE NEW GAME</span>
-                </button>
-                
-                <div className="relative flex items-center py-2">
-                  <div className="flex-grow border-t border-sky-100"></div>
-                  <span className="flex-shrink mx-4 text-sky-300 text-xs font-black uppercase">OR JOIN</span>
-                  <div className="flex-grow border-t border-sky-100"></div>
-                </div>
+              <button 
+                onClick={createOnlineGame}
+                className="w-full flex items-center justify-center gap-4 py-5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all"
+              >
+                <Globe size={24} />
+                <span>CREATE NEW GAME</span>
+              </button>
 
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Enter Game ID" 
-                    className="flex-1 px-4 py-4 rounded-2xl border-4 border-sky-50 focus:border-sky-400 outline-none text-sm font-bold"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') joinOnlineGame((e.target as HTMLInputElement).value);
-                    }}
-                  />
-                  <button 
-                    onClick={() => {
-                      const input = document.querySelector('input[placeholder="Enter Game ID"]') as HTMLInputElement;
-                      if (input) joinOnlineGame(input.value);
-                    }}
-                    className="p-4 bg-sky-500 text-white rounded-2xl hover:bg-sky-600 transition-all"
-                  >
-                    <ArrowRight size={24} />
-                  </button>
-                </div>
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-sky-100"></div>
+                <span className="flex-shrink mx-4 text-sky-300 text-xs font-black uppercase">OR JOIN BY ID</span>
+                <div className="flex-grow border-t border-sky-100"></div>
+              </div>
+
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Enter Game ID" 
+                  className="flex-1 px-4 py-4 rounded-2xl border-4 border-sky-50 focus:border-sky-400 outline-none text-sm font-bold"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') joinOnlineGame((e.target as HTMLInputElement).value);
+                  }}
+                />
+                <button 
+                  onClick={() => {
+                    const input = document.querySelector('input[placeholder="Enter Game ID"]') as HTMLInputElement;
+                    if (input) joinOnlineGame(input.value);
+                  }}
+                  className="p-4 bg-sky-500 text-white rounded-2xl hover:bg-sky-600 transition-all"
+                >
+                  <ArrowRight size={24} />
+                </button>
+              </div>
+              <button onClick={resetToMenu} className="block w-full text-pink-400 font-bold hover:underline">Back to Menu</button>
+            </div>
+
+            <div className="flex-1 bg-sky-50 rounded-[32px] p-6 flex flex-col">
+              <h3 className="text-sm font-black text-sky-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Users size={16} /> Active Lobbies
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px] pr-2 custom-scrollbar">
+                {publicGames.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-sky-300 gap-2 opacity-60">
+                    <Candy size={32} className="animate-bounce" />
+                    <p className="text-xs font-bold">No active games yet...</p>
+                  </div>
+                ) : (
+                  publicGames.map((game) => (
+                    <motion.div 
+                      key={game.id}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-white p-4 rounded-2xl shadow-sm border-2 border-white hover:border-emerald-300 transition-all cursor-pointer flex items-center justify-between group"
+                      onClick={() => joinOnlineGame(game.shortId || game.id)}
+                    >
+                      <div className="text-left">
+                        <p className="text-[10px] font-black text-sky-300 uppercase leading-none mb-1">Host</p>
+                        <p className="text-sm font-black text-sky-700">{game.player1Name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-emerald-400 uppercase leading-none mb-1">ID</p>
+                        <p className="text-sm font-mono font-black text-emerald-600 group-hover:scale-110 transition-transform">{game.shortId || game.id.substring(0,6)}</p>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
               </div>
             </div>
-            <button onClick={resetToMenu} className="mt-8 text-pink-400 font-bold hover:underline">Back to Menu</button>
           </motion.div>
         ) : board.status === 'lobby' ? (
           <motion.div 
@@ -493,10 +575,10 @@ export default function App() {
             <h2 className="text-3xl font-black mb-4 text-emerald-600">Game Created!</h2>
             <p className="text-sky-600 font-bold mb-6">Share this ID with your friend:</p>
             <div className="bg-sky-50 p-4 rounded-2xl flex items-center justify-between gap-2 border-2 border-sky-100 mb-8">
-              <code className="text-lg font-black text-sky-800">{gameId}</code>
+              <code className="text-2xl font-black text-sky-800 tracking-widest">{shortId || '...'}</code>
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(gameId || '');
+                  navigator.clipboard.writeText(shortId || '');
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}

@@ -27,8 +27,7 @@ service cloud.firestore {
 
     match /games/{gameId} {
       // Public access for 'no-login' multiplayer
-      allow read, create, update: if true;
-      allow delete: if false;
+      allow read, write: if true;
     }
 
     match /users/{userId} {
