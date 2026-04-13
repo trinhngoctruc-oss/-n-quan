@@ -428,8 +428,10 @@ export default function App() {
       currentScores[1] += p2Remaining;
       PLAYER_1_SQUARES.forEach(idx => currentStones[idx] = 0);
       PLAYER_2_SQUARES.forEach(idx => currentStones[idx] = 0);
-      const winner = currentScores[0] > currentScores[1] ? 'Player 1 Wins! 🏆' : 
-                     currentScores[1] > currentScores[0] ? (board.isVsMachine ? 'Machine Wins! 🤖' : 'Player 2 Wins! 🏆') : 'It\'s a Tie! 🤝';
+      const p1Name = board.player1Name || 'Player 1';
+      const p2Name = board.isVsMachine ? 'Machine' : (board.player2Name || 'Player 2');
+      const winner = currentScores[0] > currentScores[1] ? `${p1Name} Wins! 🏆` : 
+                     currentScores[1] > currentScores[0] ? `${p2Name} Wins! 🏆` : 'It\'s a Tie! 🤝';
       finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: winner };
       setBoard(finalBoard);
       if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
@@ -844,6 +846,13 @@ const Square = ({ index, isQuan, stones, currentPlayer, status, animatingIndex, 
   const isAnimating = animatingIndex === index;
   const isSelected = selectedSquare === index;
 
+  const isPlayer2Row = PLAYER_2_SQUARES.includes(index);
+  
+  // Direction logic: On top row (P2), indices are reversed in UI
+  // Left button should move left, Right button should move right
+  const leftDir = isPlayer2Row ? 'cw' : 'ccw';
+  const rightDir = isPlayer2Row ? 'ccw' : 'cw';
+
   return (
     <div 
       className={`relative flex items-center justify-center border-2 sm:border-4 border-sky-100 transition-all duration-300 ${
@@ -870,13 +879,13 @@ const Square = ({ index, isQuan, stones, currentPlayer, status, animatingIndex, 
           >
             <div className="flex gap-1 sm:gap-3 pointer-events-auto">
               <button 
-                onClick={(e) => { e.stopPropagation(); onMove(index, 'ccw'); }} 
+                onClick={(e) => { e.stopPropagation(); onMove(index, leftDir); }} 
                 className="p-1.5 sm:p-2 bg-white text-pink-500 rounded-full shadow-xl border-2 border-pink-200 hover:bg-pink-500 hover:text-white transition-all transform hover:scale-110"
               >
                 <ChevronLeft size={16} className="sm:w-5 sm:h-5" />
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); onMove(index, 'cw'); }} 
+                onClick={(e) => { e.stopPropagation(); onMove(index, rightDir); }} 
                 className="p-1.5 sm:p-2 bg-white text-pink-500 rounded-full shadow-xl border-2 border-pink-200 hover:bg-pink-500 hover:text-white transition-all transform hover:scale-110"
               >
                 <ChevronRight size={16} className="sm:w-5 sm:h-5" />
