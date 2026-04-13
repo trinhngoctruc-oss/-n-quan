@@ -335,7 +335,7 @@ export default function App() {
       scores: [0, 0],
       currentPlayer: 0,
       status: 'idle',
-      message: 'Your turn! Pick a candy bowl.',
+      message: 'Đến lượt bạn! Hãy chọn một ô kẹo.',
       isVsMachine: vsMachine,
     });
   };
@@ -354,7 +354,7 @@ export default function App() {
         scores: initialScores,
         currentPlayer: 0,
         status: 'idle',
-        message: 'Game Reset! Your turn! ✨',
+        message: 'Đã đặt lại! Đến lượt bạn! ✨',
         lastMove: null,
         updatedAt: serverTimestamp()
       });
@@ -365,7 +365,7 @@ export default function App() {
         scores: initialScores,
         currentPlayer: 0,
         status: 'idle',
-        message: 'New Game! Your turn! ✨',
+        message: 'Trò chơi mới! Đến lượt bạn! ✨',
       }));
     }
   };
@@ -464,10 +464,10 @@ export default function App() {
       currentScores[1] += p2Remaining;
       PLAYER_1_SQUARES.forEach(idx => currentStones[idx] = 0);
       PLAYER_2_SQUARES.forEach(idx => currentStones[idx] = 0);
-      const p1Name = board.player1Name || 'Player 1';
-      const p2Name = board.isVsMachine ? 'Machine' : (board.player2Name || 'Player 2');
-      const winner = currentScores[0] > currentScores[1] ? `${p1Name} Wins! 🏆` : 
-                     currentScores[1] > currentScores[0] ? `${p2Name} Wins! 🏆` : 'It\'s a Tie! 🤝';
+      const p1Name = board.player1Name || 'Người chơi 1';
+      const p2Name = board.isVsMachine ? 'Máy' : (board.player2Name || 'Người chơi 2');
+      const winner = currentScores[0] > currentScores[1] ? `${p1Name} Chiến thắng! 🏆` : 
+                     currentScores[1] > currentScores[0] ? `${p2Name} Chiến thắng! 🏆` : 'Hòa nhau rồi! 🤝';
       finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: winner };
       setBoard(finalBoard);
       if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
@@ -485,7 +485,7 @@ export default function App() {
         currentScores[nextPlayer] -= 5;
         nextPlayerSquares.forEach(idx => currentStones[idx] = 1);
       } else {
-        finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: 'No more candies to refill!' };
+        finalBoard = { ...finalBoard, stones: currentStones, scores: currentScores, status: 'gameOver', message: 'Hết kẹo để rải thêm rồi!' };
         setBoard(finalBoard);
         if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
         isMovingRef.current = false;
@@ -499,7 +499,7 @@ export default function App() {
       scores: currentScores,
       currentPlayer: nextPlayer as 0 | 1,
       status: 'idle',
-      message: nextPlayer === 0 ? 'Your turn! ✨' : (board.isVsMachine ? 'Machine is thinking... 🤔' : 'Player 2\'s turn! 🌈'),
+      message: nextPlayer === 0 ? 'Đến lượt bạn! ✨' : (board.isVsMachine ? 'Máy đang suy nghĩ... 🤔' : 'Đến lượt đối thủ! 🌈'),
     };
     setBoard(finalBoard);
     if (board.isOnline && !isRemote) syncBoardToFirebase(finalBoard);
@@ -544,14 +544,14 @@ export default function App() {
             className="bg-white p-6 sm:p-8 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-2xl w-full z-10 flex flex-col md:flex-row gap-8 my-4"
           >
             <div className="flex-1 space-y-6">
-              <h2 className="text-3xl font-black text-sky-600">Online Setup</h2>
+              <h2 className="text-3xl font-black text-sky-600">Thiết lập Online</h2>
               <div className="text-left">
-                <label className="block text-xs font-black text-sky-400 uppercase tracking-widest mb-2 ml-2">Your Name</label>
+                <label className="block text-xs font-black text-sky-400 uppercase tracking-widest mb-2 ml-2">Tên của bạn</label>
                 <input 
                   type="text" 
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter your name" 
+                  placeholder="Nhập tên của bạn" 
                   className="w-full px-6 py-4 rounded-2xl border-4 border-sky-50 focus:border-sky-400 outline-none text-lg font-bold transition-all"
                 />
               </div>
@@ -561,19 +561,19 @@ export default function App() {
                 className="w-full flex items-center justify-center gap-4 py-5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all"
               >
                 <Globe size={24} />
-                <span>CREATE NEW GAME</span>
+                <span>TẠO TRÒ CHƠI MỚI</span>
               </button>
 
               <div className="relative flex items-center py-2">
                 <div className="flex-grow border-t border-sky-100"></div>
-                <span className="flex-shrink mx-4 text-sky-300 text-xs font-black uppercase">OR JOIN BY ID</span>
+                <span className="flex-shrink mx-4 text-sky-300 text-xs font-black uppercase">HOẶC NHẬP MÃ ID</span>
                 <div className="flex-grow border-t border-sky-100"></div>
               </div>
 
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="Enter Game ID" 
+                  placeholder="Nhập mã ID" 
                   className="flex-1 px-4 py-4 rounded-2xl border-4 border-sky-50 focus:border-sky-400 outline-none text-sm font-bold"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') joinOnlineGame((e.target as HTMLInputElement).value);
@@ -581,7 +581,7 @@ export default function App() {
                 />
                 <button 
                   onClick={() => {
-                    const input = document.querySelector('input[placeholder="Enter Game ID"]') as HTMLInputElement;
+                    const input = document.querySelector('input[placeholder="Nhập mã ID"]') as HTMLInputElement;
                     if (input) joinOnlineGame(input.value);
                   }}
                   className="p-4 bg-sky-500 text-white rounded-2xl hover:bg-sky-600 transition-all"
@@ -589,18 +589,18 @@ export default function App() {
                   <ArrowRight size={24} />
                 </button>
               </div>
-              <button onClick={resetToMenu} className="block w-full text-pink-400 font-bold hover:underline">Back to Menu</button>
+              <button onClick={resetToMenu} className="block w-full text-pink-400 font-bold hover:underline">Quay lại Menu</button>
             </div>
 
             <div className="flex-1 bg-sky-50 rounded-[32px] p-6 flex flex-col">
               <h3 className="text-sm font-black text-sky-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Users size={16} /> Active Lobbies
+                <Users size={16} /> Phòng đang chờ
               </h3>
               <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px] pr-2 custom-scrollbar">
                 {publicGames.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-sky-300 gap-2 opacity-60">
                     <Candy size={32} className="animate-bounce" />
-                    <p className="text-xs font-bold">No active games yet...</p>
+                    <p className="text-xs font-bold">Chưa có phòng nào...</p>
                   </div>
                 ) : (
                   publicGames.map((game) => (
@@ -612,7 +612,7 @@ export default function App() {
                       onClick={() => joinOnlineGame(game.shortId || game.id)}
                     >
                       <div className="text-left">
-                        <p className="text-[10px] font-black text-sky-300 uppercase leading-none mb-1">Host</p>
+                        <p className="text-[10px] font-black text-sky-300 uppercase leading-none mb-1">Chủ phòng</p>
                         <p className="text-sm font-black text-sky-700">{game.player1Name}</p>
                       </div>
                       <div className="text-right">
@@ -633,8 +633,8 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.8 }}
             className="bg-white p-10 rounded-[40px] shadow-2xl border-8 border-emerald-100 text-center max-w-md w-full z-10"
           >
-            <h2 className="text-3xl font-black mb-4 text-emerald-600">Game Created!</h2>
-            <p className="text-sky-600 font-bold mb-6">Share this ID with your friend:</p>
+            <h2 className="text-3xl font-black mb-4 text-emerald-600">Đã tạo phòng!</h2>
+            <p className="text-sky-600 font-bold mb-6">Chia sẻ mã này với bạn bè để chơi:</p>
             <div className="bg-sky-50 p-4 rounded-2xl flex items-center justify-between gap-2 border-2 border-sky-100 mb-8">
               <code className="text-2xl font-black text-sky-800 tracking-widest">{shortId || '...'}</code>
               <button 
@@ -650,9 +650,9 @@ export default function App() {
             </div>
             <div className="flex items-center justify-center gap-3 text-sky-400 animate-pulse">
               <div className="w-2 h-2 bg-emerald-400 rounded-full" />
-              <span className="font-bold text-sm">Waiting for Player 2 to join...</span>
+              <span className="font-bold text-sm">Đang chờ đối thủ tham gia...</span>
             </div>
-            <button onClick={resetToMenu} className="mt-8 text-pink-400 font-bold hover:underline">Cancel</button>
+            <button onClick={resetToMenu} className="mt-8 text-pink-400 font-bold hover:underline">Hủy phòng</button>
           </motion.div>
         ) : board.status === 'menu' ? (
           <motion.div 
@@ -662,32 +662,32 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.8 }}
             className="bg-white p-10 rounded-[40px] shadow-2xl border-8 border-pink-100 text-center max-w-md w-full z-10"
           >
-            <h2 className="text-4xl font-black mb-8 text-sky-600">Pick a Mode!</h2>
+            <h2 className="text-4xl font-black mb-8 text-sky-600">Chọn chế độ chơi!</h2>
             <div className="space-y-4">
               <button 
                 onClick={() => startGame(true)}
                 className="w-full group relative flex items-center justify-center gap-4 py-6 bg-gradient-to-r from-sky-400 to-blue-500 text-white rounded-3xl font-black text-xl shadow-lg hover:scale-105 transition-all"
               >
                 <Cpu size={32} />
-                <span>VS MACHINE</span>
-                <div className="absolute -top-2 -right-2 bg-yellow-400 text-white text-[10px] px-2 py-1 rounded-full animate-pulse">EASY</div>
+                <span>CHƠI VỚI MÁY</span>
+                <div className="absolute -top-2 -right-2 bg-yellow-400 text-white text-[10px] px-2 py-1 rounded-full animate-pulse">DỄ</div>
               </button>
               <button 
                 onClick={() => startGame(false)}
                 className="w-full flex items-center justify-center gap-4 py-6 bg-gradient-to-r from-purple-400 to-pink-500 text-white rounded-3xl font-black text-xl shadow-lg hover:scale-105 transition-all"
               >
                 <Users size={32} />
-                <span>VS FRIEND (LOCAL)</span>
+                <span>CHƠI 2 NGƯỜI (LOCAL)</span>
               </button>
               <button 
                 onClick={() => setBoard(prev => ({ ...prev, status: 'setup' }))}
                 className="w-full flex items-center justify-center gap-4 py-6 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-xl shadow-lg hover:scale-105 transition-all"
               >
                 <Globe size={32} />
-                <span>ONLINE MULTIPLAYER</span>
+                <span>CHƠI ONLINE</span>
               </button>
             </div>
-            <p className="mt-8 text-sky-300 text-sm font-medium">Traditional Vietnamese game with a sweet twist!</p>
+            <p className="mt-8 text-sky-300 text-sm font-medium">Trò chơi dân gian Việt Nam với phong cách kẹo ngọt!</p>
           </motion.div>
         ) : (
           <motion.div 
@@ -775,17 +775,17 @@ export default function App() {
         {showRules && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-sky-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setShowRules(false)}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-white rounded-[40px] p-10 max-w-lg w-full shadow-2xl overflow-y-auto max-h-[80vh] border-8 border-sky-100" onClick={e => e.stopPropagation()}>
-              <h2 className="text-3xl font-black mb-6 text-sky-600 flex items-center gap-3"><Info /> How to Play</h2>
+              <h2 className="text-3xl font-black mb-6 text-sky-600 flex items-center gap-3"><Info /> Hướng dẫn chơi</h2>
               <div className="space-y-4 text-sky-700 text-sm font-medium leading-relaxed">
-                <p>Welcome to <strong>Candy Quan</strong>! The goal is to collect as many candies as you can.</p>
+                <p>Chào mừng bạn đến với <strong>Candy Quan</strong>! Mục tiêu của trò chơi là thu thập được nhiều kẹo nhất có thể.</p>
                 <ul className="space-y-3">
-                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">1</div> Pick a bowl from your side and spread the candies one by one.</li>
-                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">2</div> If you land next to a bowl with candies, pick them up and keep going!</li>
-                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">3</div> If you land next to an <strong>empty</strong> bowl, you capture all candies in the bowl after that! 😋</li>
-                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">4</div> The game ends when the big "Quan" bowls are empty. Most candies win!</li>
+                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">1</div> Chọn một ô dân ở phía bạn và rải kẹo lần lượt vào các ô tiếp theo.</li>
+                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">2</div> Nếu viên kẹo cuối cùng rơi vào ô sát một ô có kẹo, hãy lấy kẹo ở ô đó và tiếp tục rải!</li>
+                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">3</div> Nếu viên kẹo cuối cùng rơi vào ô sát một **ô trống**, bạn sẽ được ăn toàn bộ kẹo ở ô tiếp theo đó! 😋</li>
+                  <li className="flex gap-3"><div className="w-6 h-6 bg-pink-100 rounded-full flex-shrink-0 flex items-center justify-center text-pink-500 font-bold">4</div> Trò chơi kết thúc khi cả hai ô Quan đều trống. Người có nhiều kẹo nhất sẽ chiến thắng!</li>
                 </ul>
               </div>
-              <button onClick={() => setShowRules(false)} className="w-full mt-10 py-4 bg-sky-500 text-white rounded-2xl font-black text-lg hover:bg-sky-600 transition-all shadow-lg">SWEET!</button>
+              <button onClick={() => setShowRules(false)} className="w-full mt-10 py-4 bg-sky-500 text-white rounded-2xl font-black text-lg hover:bg-sky-600 transition-all shadow-lg">ĐÃ HIỂU!</button>
             </motion.div>
           </motion.div>
         )}
@@ -797,16 +797,16 @@ export default function App() {
               <h2 className="text-6xl font-black mb-4 drop-shadow-md">{board.message}</h2>
               <div className="flex justify-center gap-12 my-10">
                 <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md">
-                  <p className="text-pink-200 text-xs font-black uppercase tracking-widest mb-2">{board.player1Name || 'Player 1'}</p>
+                  <p className="text-pink-200 text-xs font-black uppercase tracking-widest mb-2">{board.player1Name || 'Người chơi 1'}</p>
                   <p className="text-5xl font-black">{board.scores[0]}</p>
                 </div>
                 <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md">
-                  <p className="text-purple-200 text-xs font-black uppercase tracking-widest mb-2">{board.isVsMachine ? 'Machine' : (board.player2Name || 'Player 2')}</p>
+                  <p className="text-purple-200 text-xs font-black uppercase tracking-widest mb-2">{board.isVsMachine ? 'Máy' : (board.player2Name || 'Người chơi 2')}</p>
                   <p className="text-5xl font-black">{board.scores[1]}</p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 mt-10">
-                <button onClick={playAgain} className="px-12 py-5 bg-white text-pink-600 rounded-3xl font-black text-2xl shadow-2xl hover:scale-110 transition-all">PLAY AGAIN! 🍭</button>
+                <button onClick={playAgain} className="px-12 py-5 bg-white text-pink-600 rounded-3xl font-black text-2xl shadow-2xl hover:scale-110 transition-all">CHƠI LẠI! 🍭</button>
                 <button onClick={resetToMenu} className="px-12 py-5 bg-pink-100/20 text-white border-4 border-white/30 rounded-3xl font-black text-2xl shadow-2xl hover:scale-110 transition-all">MENU</button>
               </div>
             </motion.div>
