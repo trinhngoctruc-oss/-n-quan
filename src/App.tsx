@@ -334,6 +334,32 @@ export default function App() {
     setBoard(prev => ({ ...prev, status: 'menu' }));
   };
 
+  const playAgain = async () => {
+    const initialStones = [5, 5, 5, 5, 5, 10, 5, 5, 5, 5, 5, 10];
+    const initialScores: [number, number] = [0, 0];
+    
+    if (board.isOnline && gameId) {
+      await updateDoc(doc(db, 'games', gameId), {
+        stones: initialStones,
+        scores: initialScores,
+        currentPlayer: 0,
+        status: 'idle',
+        message: 'Game Reset! Your turn! ✨',
+        lastMove: null,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      setBoard(prev => ({
+        ...prev,
+        stones: initialStones,
+        scores: initialScores,
+        currentPlayer: 0,
+        status: 'idle',
+        message: 'New Game! Your turn! ✨',
+      }));
+    }
+  };
+
   const handleMove = async (startIndex: number, direction: 'cw' | 'ccw', isRemote = false) => {
     if (board.status !== 'idle' && !isRemote) return;
     if (isMovingRef.current) return;
@@ -471,29 +497,29 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen max-h-screen bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center justify-center overflow-hidden relative">
+    <div className="h-screen max-h-screen bg-sky-50 text-sky-900 font-sans p-2 flex flex-col items-center justify-center overflow-hidden relative landscape:p-1">
       {/* Decorative Elements */}
-      <div className="absolute top-4 left-4 text-pink-300 animate-bounce opacity-50"><Star size={30} fill="currentColor" /></div>
-      <div className="absolute bottom-4 right-4 text-yellow-300 animate-pulse opacity-50"><Star size={20} fill="currentColor" /></div>
-      <div className="absolute top-10 right-10 text-purple-300 animate-spin-slow opacity-50"><Sparkles size={25} /></div>
+      <div className="absolute top-4 left-4 text-pink-300 animate-bounce opacity-50 landscape:hidden"><Star size={30} fill="currentColor" /></div>
+      <div className="absolute bottom-4 right-4 text-yellow-300 animate-pulse opacity-50 landscape:hidden"><Star size={20} fill="currentColor" /></div>
+      <div className="absolute top-10 right-10 text-purple-300 animate-spin-slow opacity-50 landscape:hidden"><Sparkles size={25} /></div>
 
       {/* Header */}
-      <div className="w-full max-w-4xl flex justify-between items-center mb-4 z-10 px-2">
+      <div className="w-full max-w-4xl flex justify-between items-center mb-4 z-10 px-2 landscape:mb-1 landscape:max-w-full">
         <div className="flex items-center gap-2">
           <motion.div 
             whileHover={{ scale: 1.1, rotate: 10 }}
-            className="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg border-2 border-white"
+            className="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg border-2 border-white landscape:w-8 landscape:h-8"
           >
-            <Candy size={20} />
+            <Candy size={20} className="landscape:w-4 landscape:h-4" />
           </motion.div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Candy Quan</h1>
+            <h1 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 landscape:text-lg">Candy Quan</h1>
           </div>
         </div>
         
         <div className="flex gap-2">
-          <button onClick={() => setShowRules(true)} className="p-2 bg-white rounded-xl text-sky-400 shadow-md hover:bg-sky-100 transition-all"><Info size={18} /></button>
-          <button onClick={resetToMenu} className="p-2 bg-white rounded-xl text-pink-400 shadow-md hover:bg-pink-50 transition-all"><RotateCcw size={18} /></button>
+          <button onClick={() => setShowRules(true)} className="p-2 bg-white rounded-xl text-sky-400 shadow-md hover:bg-sky-100 transition-all landscape:p-1.5"><Info size={18} className="landscape:w-4 landscape:h-4" /></button>
+          <button onClick={resetToMenu} className="p-2 bg-white rounded-xl text-pink-400 shadow-md hover:bg-pink-50 transition-all landscape:p-1.5"><RotateCcw size={18} className="landscape:w-4 landscape:h-4" /></button>
         </div>
       </div>
 
@@ -661,7 +687,7 @@ export default function App() {
             className="flex flex-col items-center z-10 w-full"
           >
             {/* Game Board */}
-            <div className="relative bg-white/80 backdrop-blur-md p-4 sm:p-8 rounded-[40px] sm:rounded-[60px] shadow-2xl border-4 sm:border-8 border-sky-200 mb-4 scale-[0.85] sm:scale-100 origin-center">
+            <div className="relative bg-white/80 backdrop-blur-md p-4 sm:p-8 rounded-[40px] sm:rounded-[60px] shadow-2xl border-4 sm:border-8 border-sky-200 mb-4 scale-[0.85] sm:scale-100 landscape:scale-[0.65] landscape:sm:scale-90 landscape:mb-2 origin-center">
               <div className="flex items-center gap-0">
                 <div className="mr-[-2px] sm:mr-[-4px]"><Square index={11} isQuan stones={board.stones[11]} currentPlayer={board.currentPlayer} status={board.status} animatingIndex={animatingIndex} onMove={handleMove} selectedSquare={selectedSquare} setSelectedSquare={setSelectedSquare} playerRole={playerRole} /></div>
                 <div className="flex flex-col gap-0">
@@ -680,13 +706,13 @@ export default function App() {
               </div>
 
               {/* Player Badges */}
-              <div className={`absolute -top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 ${
+              <div className={`absolute -top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 landscape:-top-6 landscape:px-4 landscape:py-1 landscape:text-xs ${
                 board.currentPlayer === 1 ? 'bg-purple-500 text-white scale-110' : 'bg-white text-purple-300'
               }`}>
                 {board.isVsMachine ? <Cpu size={16} /> : <User size={16} />}
                 {board.isVsMachine ? 'MACHINE' : (board.player2Name || 'PLAYER 2')}
               </div>
-              <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 ${
+              <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 landscape:-bottom-6 landscape:px-4 landscape:py-1 landscape:text-xs ${
                 board.currentPlayer === 0 ? 'bg-pink-500 text-white scale-110' : 'bg-white text-pink-300'
               }`}>
                 <User size={16} />
@@ -695,36 +721,36 @@ export default function App() {
             </div>
 
             {/* Scores */}
-            <div className="w-full max-w-md grid grid-cols-2 gap-4 mb-4">
-              <div className={`p-4 rounded-[24px] border-4 transition-all ${
+            <div className="w-full max-w-md grid grid-cols-2 gap-4 mb-4 landscape:mb-1 landscape:gap-2 landscape:max-w-lg">
+              <div className={`p-4 rounded-[24px] border-4 transition-all landscape:p-2 landscape:rounded-xl ${
                 board.currentPlayer === 0 ? 'bg-white border-pink-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-black text-pink-400 uppercase">{board.player1Name || 'P1'} Score</span>
-                  <Candy size={14} className="text-pink-300" />
+                  <span className="text-[10px] font-black text-pink-400 uppercase landscape:text-[8px]">{board.player1Name || 'P1'} Score</span>
+                  <Candy size={14} className="text-pink-300 landscape:w-3 landscape:h-3" />
                 </div>
-                <div className="text-2xl font-black text-sky-900">{board.scores[0]}</div>
+                <div className="text-2xl font-black text-sky-900 landscape:text-xl">{board.scores[0]}</div>
               </div>
-              <div className={`p-4 rounded-[24px] border-4 transition-all ${
+              <div className={`p-4 rounded-[24px] border-4 transition-all landscape:p-2 landscape:rounded-xl ${
                 board.currentPlayer === 1 ? 'bg-white border-purple-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-black text-purple-400 uppercase">{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
-                  <Candy size={14} className="text-purple-300" />
+                  <span className="text-[10px] font-black text-purple-400 uppercase landscape:text-[8px]">{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
+                  <Candy size={14} className="text-purple-300 landscape:w-3 landscape:h-3" />
                 </div>
-                <div className="text-2xl font-black text-sky-900">{board.scores[1]}</div>
+                <div className="text-2xl font-black text-sky-900 landscape:text-xl">{board.scores[1]}</div>
               </div>
             </div>
 
             {/* Message */}
-            <div className="text-center h-12">
+            <div className="text-center h-12 landscape:h-6">
               <AnimatePresence mode="wait">
                 <motion.p
                   key={board.message}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 1.1 }}
-                  className="text-lg font-black text-sky-600 drop-shadow-sm"
+                  className="text-lg font-black text-sky-600 drop-shadow-sm landscape:text-sm"
                 >
                   {board.message}
                 </motion.p>
@@ -769,7 +795,10 @@ export default function App() {
                   <p className="text-5xl font-black">{board.scores[1]}</p>
                 </div>
               </div>
-              <button onClick={resetToMenu} className="px-12 py-5 bg-white text-pink-600 rounded-3xl font-black text-2xl shadow-2xl hover:scale-110 transition-all">PLAY AGAIN! 🍭</button>
+              <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 mt-10">
+                <button onClick={playAgain} className="px-12 py-5 bg-white text-pink-600 rounded-3xl font-black text-2xl shadow-2xl hover:scale-110 transition-all">PLAY AGAIN! 🍭</button>
+                <button onClick={resetToMenu} className="px-12 py-5 bg-pink-100/20 text-white border-4 border-white/30 rounded-3xl font-black text-2xl shadow-2xl hover:scale-110 transition-all">MENU</button>
+              </div>
             </motion.div>
           </motion.div>
         )}
