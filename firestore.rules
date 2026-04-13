@@ -26,14 +26,8 @@ service cloud.firestore {
     // ===============================================================
 
     match /games/{gameId} {
-      // Anyone authenticated can list/create games
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidGame(request.resource.data);
-      
-      // Only players in the game can update it
-      allow update: if isPlayerInGame(resource.data) && isValidGame(request.resource.data);
-      
-      // No one can delete games for now
+      // Public access for 'no-login' multiplayer
+      allow read, create, update: if true;
       allow delete: if false;
     }
 

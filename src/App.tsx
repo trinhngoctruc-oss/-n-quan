@@ -5,24 +5,16 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RotateCcw, Info, Trophy, User, ChevronRight, ChevronLeft, Cpu, Users, Sparkles, Star, Candy, Globe, Copy, Check } from 'lucide-react';
-import { db, auth } from './firebase';
-import { 
-  signInWithPopup,
-  GoogleAuthProvider,
-  onAuthStateChanged, 
-  User as FirebaseUser 
-} from 'firebase/auth';
+import { RotateCcw, Info, Trophy, User, ChevronRight, ChevronLeft, Cpu, Users, Sparkles, Star, Candy, Globe, Copy, Check, ArrowRight } from 'lucide-react';
+import { db } from './firebase';
 import { 
   doc, 
-  setDoc, 
   onSnapshot, 
   updateDoc, 
   serverTimestamp, 
   getDoc,
   collection,
-  addDoc,
-  Timestamp
+  addDoc
 } from 'firebase/firestore';
 
 // --- Constants ---
@@ -31,7 +23,7 @@ const PLAYER_1_SQUARES = [0, 1, 2, 3, 4];
 const PLAYER_2_SQUARES = [6, 7, 8, 9, 10];
 const QUAN_SQUARES = [5, 11];
 
-type GameState = 'menu' | 'idle' | 'moving' | 'capturing' | 'gameOver' | 'lobby';
+type GameState = 'menu' | 'idle' | 'moving' | 'capturing' | 'gameOver' | 'lobby' | 'setup';
 
 interface BoardState {
   stones: number[];
@@ -43,6 +35,8 @@ interface BoardState {
   isOnline?: boolean;
   player1Id?: string;
   player2Id?: string;
+  player1Name?: string;
+  player2Name?: string;
 }
 
 export default function App() {
@@ -55,31 +49,20 @@ export default function App() {
     isVsMachine: true,
   });
 
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [playerName, setPlayerName] = useState('');
+  const [guestId] = useState(() => {
+    const saved = localStorage.getItem('candy_quan_guest_id');
+    if (saved) return saved;
+    const newId = 'guest_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('candy_quan_guest_id', newId);
+    return newId;
+  });
   const [gameId, setGameId] = useState<string | null>(null);
   const [playerRole, setPlayerRole] = useState<0 | 1 | null>(null);
   const [copied, setCopied] = useState(false);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
   const isMovingRef = useRef(false);
-
-  // --- Firebase Auth ---
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed:", error);
-      alert("Login failed. Please make sure popups are allowed.");
-    }
-  };
 
   // --- Firebase Sync ---
   useEffect(() => {
@@ -88,8 +71,18 @@ export default function App() {
     const unsubscribe = onSnapshot(doc(db, 'games', gameId), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        // Only update if it's not our own move (to avoid interrupting animations)
-        // Or if the game just started/ended
+        
+        // If we are in lobby and player 2 joins, start the game
+        if (board.status === 'lobby' && data.player2Id) {
+          setBoard(prev => ({
+            ...prev,
+            status: 'idle',
+            player2Id: data.player2Id,
+            player2Name: data.player2Name,
+            message: `${data.player2Name} joined! Game Start!`,
+          }));
+        }
+
         if (data.status === 'gameOver' || data.status === 'idle') {
           setBoard(prev => ({
             ...prev,
@@ -100,17 +93,19 @@ export default function App() {
             message: data.message,
             player1Id: data.player1Id,
             player2Id: data.player2Id,
+            player1Name: data.player1Name,
+            player2Name: data.player2Name,
           }));
         }
       }
     });
 
     return () => unsubscribe();
-  }, [gameId, board.isOnline]);
+  }, [gameId, board.isOnline, board.status]);
 
   const createOnlineGame = async () => {
-    if (!user) {
-      await loginWithGoogle();
+    if (!playerName.trim()) {
+      alert('Please enter your name first!');
       return;
     }
     const newGame = {
@@ -119,8 +114,10 @@ export default function App() {
       currentPlayer: 0,
       status: 'idle',
       message: 'Waiting for Player 2...',
-      player1Id: user.uid,
+      player1Id: guestId,
+      player1Name: playerName,
       player2Id: null,
+      player2Name: null,
       updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, 'games'), newGame);
@@ -135,8 +132,8 @@ export default function App() {
   };
 
   const joinOnlineGame = async (id: string) => {
-    if (!user) {
-      await loginWithGoogle();
+    if (!playerName.trim()) {
+      alert('Please enter your name first!');
       return;
     }
     if (!id) return;
@@ -144,16 +141,17 @@ export default function App() {
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
       const data = snapshot.data();
-      if (!data.player2Id && data.player1Id !== user.uid) {
+      if (!data.player2Id && data.player1Id !== guestId) {
         await updateDoc(docRef, {
-          player2Id: user.uid,
-          message: 'Player 2 joined! Game Start!',
+          player2Id: guestId,
+          player2Name: playerName,
+          message: `${playerName} joined! Game Start!`,
           updatedAt: serverTimestamp(),
         });
         setPlayerRole(1);
-      } else if (data.player1Id === user.uid) {
+      } else if (data.player1Id === guestId) {
         setPlayerRole(0);
-      } else if (data.player2Id === user.uid) {
+      } else if (data.player2Id === guestId) {
         setPlayerRole(1);
       } else {
         alert('Game is full!');
@@ -425,7 +423,66 @@ export default function App() {
 
       {/* Main Content Area */}
       <AnimatePresence mode="wait">
-        {board.status === 'lobby' ? (
+        {board.status === 'setup' ? (
+          <motion.div 
+            key="setup"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="bg-white p-10 rounded-[40px] shadow-2xl border-8 border-sky-100 text-center max-w-md w-full z-10"
+          >
+            <h2 className="text-3xl font-black mb-6 text-sky-600">Online Setup</h2>
+            <div className="space-y-6">
+              <div className="text-left">
+                <label className="block text-xs font-black text-sky-400 uppercase tracking-widest mb-2 ml-2">Your Name</label>
+                <input 
+                  type="text" 
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter your name" 
+                  className="w-full px-6 py-4 rounded-2xl border-4 border-sky-50 focus:border-sky-400 outline-none text-lg font-bold transition-all"
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <button 
+                  onClick={createOnlineGame}
+                  className="w-full flex items-center justify-center gap-4 py-5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-lg shadow-lg hover:scale-105 transition-all"
+                >
+                  <Globe size={24} />
+                  <span>CREATE NEW GAME</span>
+                </button>
+                
+                <div className="relative flex items-center py-2">
+                  <div className="flex-grow border-t border-sky-100"></div>
+                  <span className="flex-shrink mx-4 text-sky-300 text-xs font-black uppercase">OR JOIN</span>
+                  <div className="flex-grow border-t border-sky-100"></div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Enter Game ID" 
+                    className="flex-1 px-4 py-4 rounded-2xl border-4 border-sky-50 focus:border-sky-400 outline-none text-sm font-bold"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') joinOnlineGame((e.target as HTMLInputElement).value);
+                    }}
+                  />
+                  <button 
+                    onClick={() => {
+                      const input = document.querySelector('input[placeholder="Enter Game ID"]') as HTMLInputElement;
+                      if (input) joinOnlineGame(input.value);
+                    }}
+                    className="p-4 bg-sky-500 text-white rounded-2xl hover:bg-sky-600 transition-all"
+                  >
+                    <ArrowRight size={24} />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button onClick={resetToMenu} className="mt-8 text-pink-400 font-bold hover:underline">Back to Menu</button>
+          </motion.div>
+        ) : board.status === 'lobby' ? (
           <motion.div 
             key="lobby"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -480,23 +537,12 @@ export default function App() {
                 <span>VS FRIEND (LOCAL)</span>
               </button>
               <button 
-                onClick={createOnlineGame}
+                onClick={() => setBoard(prev => ({ ...prev, status: 'setup' }))}
                 className="w-full flex items-center justify-center gap-4 py-6 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-3xl font-black text-xl shadow-lg hover:scale-105 transition-all"
               >
                 <Globe size={32} />
-                <span>{user ? 'ONLINE MULTIPLAYER' : 'LOGIN TO PLAY ONLINE'}</span>
+                <span>ONLINE MULTIPLAYER</span>
               </button>
-              
-              <div className="pt-4 flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Enter Game ID to Join" 
-                  className="flex-1 px-4 py-3 rounded-xl border-2 border-sky-100 focus:border-sky-400 outline-none text-sm font-bold"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') joinOnlineGame((e.target as HTMLInputElement).value);
-                  }}
-                />
-              </div>
             </div>
             <p className="mt-8 text-sky-300 text-sm font-medium">Traditional Vietnamese game with a sweet twist!</p>
           </motion.div>
@@ -531,13 +577,13 @@ export default function App() {
                 board.currentPlayer === 1 ? 'bg-purple-500 text-white scale-110' : 'bg-white text-purple-300'
               }`}>
                 {board.isVsMachine ? <Cpu size={16} /> : <User size={16} />}
-                {board.isVsMachine ? 'MACHINE' : 'PLAYER 2'}
+                {board.isVsMachine ? 'MACHINE' : (board.player2Name || 'PLAYER 2')}
               </div>
               <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full text-sm font-black transition-all shadow-lg flex items-center gap-2 ${
                 board.currentPlayer === 0 ? 'bg-pink-500 text-white scale-110' : 'bg-white text-pink-300'
               }`}>
                 <User size={16} />
-                PLAYER 1
+                {board.player1Name || 'PLAYER 1'}
               </div>
             </div>
 
@@ -547,7 +593,7 @@ export default function App() {
                 board.currentPlayer === 0 ? 'bg-white border-pink-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-pink-400 uppercase">P1 Score</span>
+                  <span className="text-xs font-black text-pink-400 uppercase">{board.player1Name || 'P1'} Score</span>
                   <Candy size={16} className="text-pink-300" />
                 </div>
                 <div className="text-4xl font-black text-sky-900">{board.scores[0]}</div>
@@ -556,7 +602,7 @@ export default function App() {
                 board.currentPlayer === 1 ? 'bg-white border-purple-400 shadow-xl scale-105' : 'bg-white/50 border-transparent opacity-70'
               }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-purple-400 uppercase">{board.isVsMachine ? 'AI' : 'P2'} Score</span>
+                  <span className="text-xs font-black text-purple-400 uppercase">{board.isVsMachine ? 'AI' : (board.player2Name || 'P2')} Score</span>
                   <Candy size={16} className="text-purple-300" />
                 </div>
                 <div className="text-4xl font-black text-sky-900">{board.scores[1]}</div>
@@ -608,11 +654,11 @@ export default function App() {
               <h2 className="text-6xl font-black mb-4 drop-shadow-md">{board.message}</h2>
               <div className="flex justify-center gap-12 my-10">
                 <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md">
-                  <p className="text-pink-200 text-xs font-black uppercase tracking-widest mb-2">Player 1</p>
+                  <p className="text-pink-200 text-xs font-black uppercase tracking-widest mb-2">{board.player1Name || 'Player 1'}</p>
                   <p className="text-5xl font-black">{board.scores[0]}</p>
                 </div>
                 <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md">
-                  <p className="text-purple-200 text-xs font-black uppercase tracking-widest mb-2">{board.isVsMachine ? 'Machine' : 'Player 2'}</p>
+                  <p className="text-purple-200 text-xs font-black uppercase tracking-widest mb-2">{board.isVsMachine ? 'Machine' : (board.player2Name || 'Player 2')}</p>
                   <p className="text-5xl font-black">{board.scores[1]}</p>
                 </div>
               </div>
